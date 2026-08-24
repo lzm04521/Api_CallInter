@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ApiCallInter · Web UI 布局原型（示意）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f5f7fa; color: #1f2937; font-size: 14px; display: flex; flex-direction: column; }
+  .mono { font-family: Consolas, monospace; }
+
+  /* 顶部 banner（全宽） */
+  .banner { height: 56px; flex-shrink: 0; background: linear-gradient(135deg, #1e40af, #3b82f6); color: #fff; display: flex; align-items: center; gap: 12px; padding: 0 24px; }
+  .logo { width: 28px; height: 28px; border-radius: 6px; background: #fff; color: #1d4ed8; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .app-title { font-size: 16px; font-weight: 600; letter-spacing: .5px; }
+  .banner-status { margin-left: auto; display: flex; gap: 18px; font-size: 13px; color: rgba(255,255,255,.8); }
+  .banner-status b { color: #fff; font-weight: 600; }
+
+  /* 左导航 + 右内容 */
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .side { width: 176px; flex-shrink: 0; background: #fff; border-right: 1px solid #e5e7eb; padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
+  .side a { padding: 10px 14px; border-radius: 6px; color: #4b5563; cursor: pointer; }
+  .side a:hover { background: #f3f4f6; }
+  .side a.active { background: #eff6ff; color: #2563eb; font-weight: 600; }
+  main { flex: 1; min-width: 0; padding: 20px 24px; overflow: auto; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* 通用组件 */
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
+  .btn { display: inline-block; padding: 6px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; font-size: 13px; }
+  .btn-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .btn-link { border: none; color: #2563eb; background: none; padding: 4px 8px; cursor: pointer; font-size: 13px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; }
+  .badge-green { background: #dcfce7; color: #15803d; }
+  .badge-red { background: #fee2e2; color: #b91c1c; }
+  .badge-gray { background: #f3f4f6; color: #6b7280; }
+  .badge-purple { background: #ede9fe; color: #6d28d9; }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  th { text-align: left; font-size: 12px; color: #6b7280; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; background: #fafbfc; white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
+
+  /* 概览（卡片自适应列数） */
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat .num { font-size: 24px; font-weight: 700; }
+  .stat .label { color: #6b7280; font-size: 12px; margin-top: 2px; }
+  .stat .num.bad { color: #dc2626; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .proj-card h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .proj-card .meta { color: #6b7280; font-size: 12px; margin: 6px 0 10px; }
+  .next-run { background: #eff6ff; border-radius: 6px; padding: 8px 10px; font-size: 13px; display: flex; justify-content: space-between; margin-bottom: 10px; }
+  .proj-card .ops { display: flex; gap: 8px; }
+
+  /* 表单 */
+  .form-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .form-row label { width: 100px; text-align: right; color: #374151; flex-shrink: 0; }
+  .form-row .hint { color: #9ca3af; font-size: 12px; }
+  input[type=text], select { padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; width: 220px; font-size: 13px; }
+  .switch { position: relative; width: 40px; height: 22px; background: #d1d5db; border-radius: 999px; cursor: pointer; flex-shrink: 0; }
+  .switch.on { background: #2563eb; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .switch.on::after { left: 20px; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+  .pager { display: flex; gap: 6px; align-items: center; color: #6b7280; padding: 12px; justify-content: flex-end; }
+  .code200 { color: #15803d; font-weight: 600; }
+  .codeERR { color: #dc2626; font-weight: 600; }
+  .note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 10px 12px; border-radius: 6px; font-size: 13px; margin: 12px 0; }
+  .sec-h { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+  a.ext { color: #2563eb; }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <div class="logo">A</div>
+  <div class="app-title">ApiCallInter · API 定时保活</div>
+  <div class="banner-status">
+    <span>运行 <b class="mono">3d 02:14</b></span>
+    <span>内存 <b class="mono">48.2 MB</b></span>
+    <span>版本 <b class="mono">v1.0.0</b></span>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="side">
+    <a class="active" data-p="p1">概览</a>
+    <a data-p="p2">项目管理</a>
+    <a data-p="p3">请求日志</a>
+    <a data-p="p4">系统设置</a>
+    <a data-p="p5">关于</a>
+  </aside>
+
+  <main>
+    <!-- ======================= 概览 ======================= -->
+    <div class="page active" id="p1">
+      <div class="stat-row">
+        <div class="card stat"><div class="num">6</div><div class="label">项目（5 启用）</div></div>
+        <div class="card stat"><div class="num">18</div><div class="label">接口（16 启用）</div></div>
+        <div class="card stat"><div class="num">4,216</div><div class="label">24h 请求</div></div>
+        <div class="card stat"><div class="num bad">3</div><div class="label">24h 失败</div></div>
+        <div class="card stat"><div class="num">99.9%</div><div class="label">24h 成功率</div></div>
+      </div>
+      <div class="grid">
+        <div class="card proj-card">
+          <h3>SMOM-华东 <span class="badge badge-green">启用</span></h3>
+          <div class="meta">间隔 120s ± 3000ms · 4 个接口 · VPN: 客户A IPSec</div>
+          <div class="next-run"><span>下次执行</span><b class="mono">00:02:41</b></div>
+          <div class="meta">最近一轮：4/4 成功 · 200 × 4 · <span class="mono">10:32:05</span></div>
+          <div class="ops"><button class="btn">立即请求</button><button class="btn">停用</button></div>
+        </div>
+        <div class="card proj-card">
+          <h3>SMOM-华南 <span class="badge badge-green">启用</span></h3>
+          <div class="meta">间隔 300s ± 5000ms · 6 个接口 · VPN: 客户B SSL</div>
+          <div class="next-run"><span>下次执行</span><b class="mono">00:06:12</b></div>
+          <div class="meta">最近一轮：5/6 成功 · <span class="badge badge-red">1 失败</span> · <span class="mono">10:30:41</span></div>
+          <div class="ops"><button class="btn">立即请求</button><button class="btn">停用</button></div>
+        </div>
+        <div class="card proj-card">
+          <h3>WMS-测试 <span class="badge badge-gray">停用</span></h3>
+          <div class="meta">间隔 600s ± 3000ms · 8 个接口</div>
+          <div class="next-run" style="background:#f3f4f6"><span>下次执行</span><b>—</b></div>
+          <div class="meta">最近一轮：8/8 成功 · <span class="mono">09:58:02</span></div>
+          <div class="ops"><button class="btn">立即请求</button><button class="btn btn-primary">启用</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= 项目管理 ======================= -->
+    <div class="page" id="p2">
+      <div class="toolbar">
+        <button class="btn btn-primary">＋ 新建项目</button>
+        <input type="text" placeholder="搜索项目名 / 备注" style="margin-left:auto;width:240px">
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table>
+          <tr><th>项目</th><th>备注</th><th>间隔</th><th>抖动</th><th>接口</th><th>最近状态</th><th>启用</th><th style="width:180px">操作</th></tr>
+          <tr>
+            <td><b>SMOM-华东</b></td><td>客户A IPSec VPN</td>
+            <td class="mono">120s</td><td class="mono">±3000ms</td><td>4</td>
+            <td><span class="badge badge-green">4/4 成功</span></td>
+            <td><div class="switch on"></div></td>
+            <td><button class="btn-link">展开接口</button><button class="btn-link">编辑</button><button class="btn-link" style="color:#dc2626">删除</button></td>
+          </tr>
+          <tr style="background:#fafbff">
+            <td colspan="8" style="padding:14px 16px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <b>SMOM-华东 · 接口列表</b><button class="btn">＋ 新建接口</button>
+              </div>
+              <table>
+                <tr><th>接口名</th><th>URL</th><th>方法</th><th>超时</th><th>最近</th><th>启用</th><th style="width:170px">操作</th></tr>
+                <tr>
+                  <td>健康检查</td><td class="mono">https://hd.example.com/api/health</td>
+                  <td><span class="badge badge-green">GET</span></td><td class="mono">30s</td>
+                  <td><span class="code200 mono">200 · 84ms</span></td>
+                  <td><div class="switch on"></div></td>
+                  <td><button class="btn-link">立即请求</button><button class="btn-link">编辑</button><button class="btn-link" style="color:#dc2626">删除</button></td>
+                </tr>
+                <tr>
+                  <td>登录保活</td><td class="mono">https://hd.example.com/api/session/keep</td>
+                  <td><span class="badge badge-purple">POST</span></td><td class="mono">30s</td>
+                  <td><span class="codeERR mono">TIMEOUT</span></td>
+                  <td><div class="switch on"></div></td>
+                  <td><button class="btn-link">立即请求</button><button class="btn-link">编辑</button><button class="btn-link" style="color:#dc2626">删除</button></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr><td><b>SMOM-华南</b></td><td>客户B SSL VPN</td><td class="mono">300s</td><td class="mono">±5000ms</td><td>6</td>
+            <td><span class="badge badge-red">5/6 成功</span></td><td><div class="switch on"></div></td>
+            <td><button class="btn-link">展开接口</button><button class="btn-link">编辑</button><button class="btn-link" style="color:#dc2626">删除</button></td></tr>
+          <tr><td><b>WMS-测试</b></td><td>内网测试环境</td><td class="mono">600s</td><td class="mono">±3000ms</td><td>8</td>
+            <td><span class="badge badge-green">8/8 成功</span></td><td><div class="switch"></div></td>
+            <td><button class="btn-link">展开接口</button><button class="btn-link">编辑</button><button class="btn-link" style="color:#dc2626">删除</button></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ======================= 请求日志 ======================= -->
+    <div class="page" id="p3">
+      <div class="toolbar">
+        <select><option>全部项目</option><option>SMOM-华东</option><option>SMOM-华南</option></select>
+        <select><option>全部接口</option><option>健康检查</option><option>登录保活</option></select>
+        <select><option>全部结果</option><option>成功</option><option>失败</option></select>
+        <button class="btn btn-primary">查询</button>
+        <span style="margin-left:auto;color:#6b7280">共 4,216 条</span>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table>
+          <tr><th>时间</th><th>项目</th><th>接口</th><th>状态</th><th>耗时</th><th>错误信息</th></tr>
+          <tr><td class="mono">10:32:05</td><td>SMOM-华东</td><td>健康检查</td><td class="code200 mono">200</td><td class="mono">84ms</td><td></td></tr>
+          <tr><td class="mono">10:30:41</td><td>SMOM-华南</td><td>登录保活</td><td class="codeERR mono">ERR</td><td class="mono">30,012ms</td><td style="color:#b91c1c">TaskCanceledException: 请求超时（30s）</td></tr>
+          <tr><td class="mono">10:30:40</td><td>SMOM-华南</td><td>健康检查</td><td class="code200 mono">200</td><td class="mono">96ms</td><td></td></tr>
+          <tr><td class="mono">10:30:02</td><td>SMOM-华东</td><td>健康检查</td><td class="code200 mono">200</td><td class="mono">79ms</td><td></td></tr>
+          <tr><td class="mono">10:29:58</td><td>WMS-测试</td><td>库存查询</td><td class="codeERR mono">ERR</td><td class="mono">5,103ms</td><td style="color:#b91c1c">HttpRequestException: 无法连接远程服务器（VPN 已断开？）</td></tr>
+        </table>
+        <div class="pager">‹ <b>1</b> 2 3 … 42 ›</div>
+      </div>
+    </div>
+
+    <!-- ======================= 系统设置 ======================= -->
+    <div class="page" id="p4">
+      <div class="card" style="width:100%">
+        <div class="sec-h">系统设置</div>
+        <div class="form-row">
+          <label>监控端口</label>
+          <input type="text" class="mono" value="61121">
+          <span class="hint">Web 管理页监听端口（1024–65535），保存后需重启程序生效</span>
+        </div>
+        <div class="form-row">
+          <label>开机自启</label>
+          <div class="switch on"></div>
+          <span class="hint">写入当前用户注册表 Run 键，与托盘菜单开关同源</span>
+        </div>
+        <div class="form-row" style="margin-top:20px">
+          <label></label>
+          <button class="btn btn-primary">保存</button>
+          <button class="btn">立即重启程序</button>
+        </div>
+        <div class="note">提示：修改端口后需重启程序；重启期间托盘图标会短暂消失，定时调度暂停数秒。</div>
+      </div>
+    </div>
+
+    <!-- ======================= 关于 ======================= -->
+    <div class="page" id="p5">
+      <div class="card" style="width:100%">
+        <div class="sec-h">关于</div>
+        <div class="form-row"><label>当前版本</label><b class="mono">v1.0.0</b><button class="btn" style="margin-left:12px">检查更新</button></div>
+        <hr style="border:none;border-top:1px solid #f3f4f6;margin:14px 0">
+        <div class="form-row"><label>最新版本</label><b class="mono" style="color:#15803d">v1.1.0</b><span class="badge badge-green">有新版本</span></div>
+        <div class="form-row" style="align-items:flex-start">
+          <label>更新说明</label>
+          <div style="color:#374151">
+            · 新增定时抖动设置，避免固定间隔特征<br>
+            · 修复长时间运行内存缓慢增长问题<br>
+            · 请求失败分类展示优化
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:20px">
+          <label></label>
+          <button class="btn btn-primary">一键升级（下载 → 重启）</button>
+          <a class="ext" href="#" style="align-self:center">前往 GitHub Release 页 →</a>
+        </div>
+        <div class="note">升级流程：下载新版本 zip → 解压校验 → 自动重启完成替换（全过程写 update.log，失败不影响当前版本运行）。</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.side a').forEach(function (a) {
+    a.onclick = function () {
+      document.querySelectorAll('.side a').forEach(function (x) { x.classList.remove('active'); });
+      document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
+      a.classList.add('active');
+      document.getElementById(a.dataset.p).classList.add('active');
+    };
+  });
+</script>
+</body>
+</html>
