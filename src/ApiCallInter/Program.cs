@@ -87,7 +87,8 @@ internal static class Program
     /// <summary>Task 7 宿主组装整体迁移至此，另增托盘/自启/更新占位注册。</summary>
     internal static WebApplication BuildWebHost(int port)
     {
-        var builder = WebApplication.CreateBuilder();
+        // 内容根固定为 exe 目录：开机自启/AppRestarter 不带工作目录启动，CWD 任意时 UseStaticFiles 找不到 wwwroot 会整页 404
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
         builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
         builder.Host.UseSerilog((_, cfg) => cfg
             .WriteTo.File(Path.Combine(AppPaths.LogsDir, "app-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 30)

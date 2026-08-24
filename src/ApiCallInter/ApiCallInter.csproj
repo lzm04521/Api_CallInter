@@ -19,4 +19,8 @@
   <ItemGroup>
     <None Update="appsettings.json"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
   </ItemGroup>
+  <!-- 内容根已固定为输出目录（Program.cs），wwwroot 需随构建复制到 exe 旁（普通 SDK 不带 Web SDK 的默认 wwwroot 内容项） -->
+  <ItemGroup>
+    <Content Include="wwwroot\**\*"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
+  </ItemGroup>
 </Project>
