@@ -1,0 +1,26 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish (self-contained win-x64)
+        run: |
+          $ver = '${{ github.ref_name }}'.TrimStart('v')
+          dotnet publish src/ApiCallInter -c Release -r win-x64 --self-contained -p:Version=$ver -o publish
+      - name: Pack zip
+        run: Compress-Archive -Path publish/* -DestinationPath ApiCallInter-win-x64.zip
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ApiCallInter-win-x64.zip
+          generate_release_notes: true
