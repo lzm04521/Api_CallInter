@@ -60,14 +60,10 @@ public class TrayApplicationContext : ApplicationContext
 
     private static Icon BuildIcon()
     {
-        using var bmp = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.Clear(Color.Transparent);
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.FillEllipse(Brushes.RoyalBlue, 2, 2, 28, 28);
-            g.DrawString("A", new Font("Segoe UI", 14, FontStyle.Bold), Brushes.White, 6f, 4f);
-        }
-        return Icon.FromHandle(bmp.GetHicon());
+        // csproj ApplicationIcon 已把 ApiCallInter.ico 嵌入 exe，托盘直接提取内嵌图标（免随包分发 ico 文件）；
+        // 提取失败退回系统默认图标：托盘图标仅是展示位，不应阻断启动
+        var exePath = Environment.ProcessPath ?? Application.ExecutablePath;
+        try { return Icon.ExtractAssociatedIcon(exePath) ?? SystemIcons.Application; }
+        catch { return SystemIcons.Application; }
     }
 }
