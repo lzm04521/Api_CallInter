@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using ApiCallInter.Data;
@@ -26,11 +27,22 @@ public class ApiInvoker(IHttpClientFactory factory, IServiceScopeFactory scopeFa
         try
         {
             using var req = new HttpRequestMessage(new HttpMethod(ep.Method), ep.Url);
-            if (!string.IsNullOrWhiteSpace(ep.Headers))
-                foreach (var (k, v) in JsonSerializer.Deserialize<Dictionary<string, string>>(ep.Headers) ?? [])
-                    req.Headers.TryAddWithoutValidation(k, v);
+            // 先建 content：Content-* 是内容头，挂在 req.Headers 会抛 InvalidOperationException(Misused header name)
             if (!string.IsNullOrWhiteSpace(ep.Body) && ep.Method is "POST" or "PUT")
                 req.Content = new StringContent(ep.Body, Encoding.UTF8, "text/plain");
+            if (!string.IsNullOrWhiteSpace(ep.Headers))
+                foreach (var (k, v) in JsonSerializer.Deserialize<Dictionary<string, string>>(ep.Headers) ?? [])
+                {
+                    if (!k.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
+                        req.Headers.TryAddWithoutValidation(k, v);
+                    else if (req.Content is null)
+                        continue;   // 无请求体时跳过内容头，不抛异常
+                    else if (k.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                        // 覆盖 StringContent 的 text/plain 默认值；未配置 Content-Type 时保持默认不变
+                        req.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(v);
+                    else
+                        req.Content.Headers.TryAddWithoutValidation(k, v);
+                }
             using var resp = await client.SendAsync(req, cts.Token);
             var code = (int)resp.StatusCode;
             return new InvokeResult(code is >= 200 and < 300, code, sw.ElapsedMilliseconds, null);
