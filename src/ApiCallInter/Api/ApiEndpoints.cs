@@ -77,6 +77,22 @@ public static class ApiEndpoints
             _ = Task.Run(async () => { await Task.Delay(300); AppRestarter.RestartDelayed(); });
             return Results.Ok();
         });
+
+        // 应用内更新（spec 4.5~4.6）：检查 / 下载解压 / 升级重启。GitHub 不可达/无 release 时 CheckAsync 抛异常 → 500，关于页降级显示"暂不可用"
+        g.MapGet("/update/check", async (UpdateService u) => await u.CheckAsync() is { } c ? Results.Ok(c) : Results.NotFound());
+        g.MapPost("/update/prepare", async (UpdateService u) =>
+        {
+            var check = await u.CheckAsync() ?? throw new ValidationException("无可用更新");
+            var dir = await u.PrepareAsync(check);
+            return Results.Ok(new { ready = true, version = check.LatestVersion, dir });
+        });
+        g.MapPost("/update/restart", async (UpdateService u) =>
+        {
+            var check = await u.CheckAsync() ?? throw new ValidationException("无可用更新");
+            var dir = await u.PrepareAsync(check);
+            _ = Task.Run(async () => { await Task.Delay(300); AppRestarter.StartUpdaterAndExit(dir); });
+            return Results.Ok();
+        });
     }
 }
 
