@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # codegraph 本地索引
 .codegraph/
+
+# 本地设计/实施文档，不入库
+doc/
