@@ -13,13 +13,17 @@ public class RegistryAutoStartManager : IAutoStartManager
     public bool IsEnabled()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKey);
-        return key?.GetValue(ValueName) is string;
+        // 兼容读取带引号（新）与不带引号（旧安装）两种值，均按去掉引号后与当前 exe 全路径比对
+        return key?.GetValue(ValueName) is string v
+            && Environment.ProcessPath is { } exe
+            && string.Equals(v.Trim('"'), exe, StringComparison.OrdinalIgnoreCase);
     }
 
     public void SetEnabled(bool enabled)
     {
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
-        if (enabled) key.SetValue(ValueName, Environment.ProcessPath!);
+        // Run 键值按命令行解析：路径含空格时必须加引号，否则 Windows 会把 "C:\Program" 当可执行文件而静默失效
+        if (enabled) key.SetValue(ValueName, $"\"{Environment.ProcessPath!}\"");
         else key.DeleteValue(ValueName, throwOnMissingValue: false);
     }
 }
