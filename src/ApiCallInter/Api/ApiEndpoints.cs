@@ -55,7 +55,31 @@ public static class ApiEndpoints
         });
 
         g.MapGet("/overview", async (OverviewService s) => await s.GetAsync());
-        g.MapGet("/settings", async (AppDbContext db) =>
-            Results.Ok(new { webPort = await SettingsService.GetPortAsync(db) ?? SettingsService.DefaultPort }));
+        g.MapGet("/settings", async (AppDbContext db, IAutoStartManager auto) =>
+            Results.Ok(new { webPort = await SettingsService.GetPortAsync(db) ?? SettingsService.DefaultPort, autoStart = auto.IsEnabled() }));
+
+        // 修改端口写库并提示需重启；1024~65535 校验走 ValidationException → 400
+        g.MapPut("/settings", async (AppDbContext db, UpdatePortRequest req) =>
+        {
+            if (req.WebPort is < 1024 or > 65535) throw new ValidationException("端口必须在 1024~65535");
+            var old = await SettingsService.GetPortAsync(db) ?? SettingsService.DefaultPort;
+            await SettingsService.SetPortAsync(db, req.WebPort);
+            return Results.Ok(new { needsRestart = req.WebPort != old });
+        });
+        g.MapPost("/settings/autostart", (IAutoStartManager m, AutoStartRequest req) =>
+        {
+            m.SetEnabled(req.Enabled);
+            return Results.Ok(new { enabled = req.Enabled });
+        });
+        // 延迟 300ms 让响应先回到客户端，再拉起 --delayed-start 新实例并退出当前进程
+        g.MapPost("/app/restart", () =>
+        {
+            _ = Task.Run(async () => { await Task.Delay(300); AppRestarter.RestartDelayed(); });
+            return Results.Ok();
+        });
     }
 }
+
+// 请求体 DTO：minimal API 的简单类型参数只会从 query 绑定，按契约 {webPort}/{enabled} 的 JSON body 需用记录类型
+public record UpdatePortRequest(int WebPort);
+public record AutoStartRequest(bool Enabled);
