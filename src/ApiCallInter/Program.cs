@@ -37,6 +37,7 @@ internal static class Program
         {
             Directory.CreateDirectory(AppPaths.DataDir);
             Directory.CreateDirectory(AppPaths.LogsDir);
+            UpdateService.CleanupStaleUpdates();   // 启动清上次升级残留（spec 4.6），失败留待下次
             using (var db = AppDbContext.Create(AppPaths.DbPath)) db.Database.EnsureCreated();
             using (var db = AppDbContext.Create(AppPaths.DbPath)) port = SettingsService.GetPortAsync(db).GetAwaiter().GetResult() ?? SettingsService.DefaultPort;
         }
@@ -106,6 +107,8 @@ internal static class Program
         builder.Services.AddScoped<ProjectService>();
         builder.Services.AddScoped<OverviewService>();
         builder.Services.AddSingleton<IAutoStartManager, RegistryAutoStartManager>();
+        builder.Services.AddHttpClient("github");   // GitHub Release 检查/下载，默认超时 100s 足够
+        builder.Services.AddSingleton<UpdateService>();
         builder.Services.Configure<SchedulerOptions>(builder.Configuration.GetSection("Scheduler"));
         builder.Services.Configure<UpdateOptions>(builder.Configuration.GetSection("Update"));
 
