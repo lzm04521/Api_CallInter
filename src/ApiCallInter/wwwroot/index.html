@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ApiCallInter · API 定时保活</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div class="banner">
+    <div class="logo">A</div>
+    <div class="app-title">ApiCallInter · API 定时保活</div>
+    <div class="banner-status">
+      <span>运行 <b class="mono">{{ uptimeText }}</b></span>
+      <span>内存 <b class="mono">{{ fmtBytes(overview.workingSetBytes) }}</b></span>
+      <span>版本 <b class="mono">{{ overview.version || '…' }}</b></span>
+    </div>
+  </div>
+  <div class="layout">
+    <aside class="side">
+      <a v-for="t in tabs" :key="t.id" :class="{active: tab===t.id}" @click="tab=t.id">{{ t.name }}</a>
+    </aside>
+    <main>
+      <overview-page v-if="tab==='overview'" :overview="overview" @refresh="loadOverview" @invoke="invokeProject" @toggle="toggleProject"></overview-page>
+      <projects-page v-if="tab==='projects'" @changed="loadAll"></projects-page>
+      <logs-page v-if="tab==='logs'"></logs-page>
+      <settings-page v-if="tab==='settings'" :settings="settings" @saved="loadSettings" @restarting="notifyRestart"></settings-page>
+      <about-page v-if="tab==='about'" :version="overview.version" @restarting="notifyRestart"></about-page>
+    </main>
+  </div>
+</div>
+<script src="vendor/vue.global.prod.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
