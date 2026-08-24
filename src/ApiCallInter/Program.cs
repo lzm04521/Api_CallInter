@@ -90,7 +90,12 @@ internal static class Program
     {
         // 内容根固定为 exe 目录：开机自启/AppRestarter 不带工作目录启动，CWD 任意时 UseStaticFiles 找不到 wwwroot 会整页 404
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
-        builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
+        // spec §10：host 由 appsettings Urls 模板控制（可改 0.0.0.0 远程管理），端口由设置页（DB）控制；
+        // 代码 UseUrls 会覆盖配置 Urls 键，故从模板解析 host 后与 DB 端口重组，而不是直接忽略配置
+        var urlTemplate = builder.Configuration["Urls"] ?? "http://127.0.0.1:61121";
+        string host;
+        try { host = new Uri(urlTemplate.Replace("*", "0.0.0.0")).Host; } catch { host = "127.0.0.1"; }
+        builder.WebHost.UseUrls($"http://{host}:{port}");
         builder.Host.UseSerilog((_, cfg) => cfg
             .WriteTo.File(Path.Combine(AppPaths.LogsDir, "app-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 30)
             .MinimumLevel.Information());

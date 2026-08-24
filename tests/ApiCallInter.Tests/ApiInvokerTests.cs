@@ -91,6 +91,35 @@ public class ApiInvokerTests
         Assert.Equal("hello=1", bodyText);
     }
 
+    [Fact]
+    public async Task Post_JsonContentType_RoutedToContentHeaders_NoException()
+    {
+        string? contentType = null;
+        var handler = new StubHttpMessageHandler((req, _) =>
+        {
+            contentType = req.Content?.Headers.ContentType?.ToString();
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+        });
+        var (invoker, _) = Build(handler);
+        var ep = Ep(); ep.Method = "POST";
+        ep.Headers = """{"Content-Type":"application/json"}""";
+        ep.Body = """{"name":"保活","url":"http://test.local/api"}""";
+        var r = await invoker.InvokeAsync(ep);
+        Assert.True(r.Success);
+        Assert.Null(r.ErrorMessage);                    // 修复前：Misused header name → 每轮都记失败
+        Assert.Equal("application/json", contentType);  // 内容头实际生效
+    }
+
+    [Fact]
+    public async Task Get_WithContentTypeHeader_Skipped_NoThrow()
+    {
+        var (invoker, _) = Build(StubHttpMessageHandler.Ok());
+        var ep = Ep(); ep.Headers = """{"Content-Type":"application/json"}""";   // GET 无 body，无 req.Content
+        var r = await invoker.InvokeAsync(ep);
+        Assert.True(r.Success);
+        Assert.Null(r.ErrorMessage);
+    }
+
     private static ApiEndpoint Ep(int id = 1) => new()
     { Id = id, ProjectId = 9, Name = "健康检查", Url = "http://test.local/api", Method = "GET", TimeoutSeconds = 1, Enabled = true };
 }
