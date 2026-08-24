@@ -56,14 +56,24 @@ public class UpdateService(IHttpClientFactory factory, IOptions<UpdateOptions> o
     {
         var version = check.LatestVersion!.TrimStart('v');
         var dir = Path.Combine(AppPaths.UpdatesDir, version);
+        // 失败即清理（下方 catch），目录存在仅当上次解压完整成功，早退不会被半截目录投毒
         if (Directory.Exists(dir)) return dir;
         Directory.CreateDirectory(AppPaths.UpdatesDir);   // 启动时 CleanupStaleUpdates 可能已整目录删除
         var zipPath = Path.Combine(AppPaths.UpdatesDir, $"{version}.zip");
-        var client = factory.CreateClient("github");
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("ApiCallInter");
-        await using (var s = await client.GetStreamAsync(check.DownloadUrl))
-            await using (var f = File.Create(zipPath)) await s.CopyToAsync(f);
-        ZipFile.ExtractToDirectory(zipPath, dir, overwriteFiles: true);
+        try
+        {
+            var client = factory.CreateClient("github");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("ApiCallInter");
+            await using (var s = await client.GetStreamAsync(check.DownloadUrl))
+                await using (var f = File.Create(zipPath)) await s.CopyToAsync(f);
+            ZipFile.ExtractToDirectory(zipPath, dir, overwriteFiles: true);
+        }
+        catch (Exception)
+        {
+            // spec 4.6 失败清理残留：删半截 zip 与解压目录后原样上抛（清理自身失败也吞掉，保留原始异常）
+            try { File.Delete(zipPath); Directory.Delete(dir, recursive: true); } catch { }
+            throw;
+        }
         logger.LogInformation("更新包就绪：{Dir}", dir);
         return dir;
     }
