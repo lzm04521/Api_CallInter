@@ -15,8 +15,11 @@ namespace ApiCallInter;
 
 internal static class Program
 {
+    // 同步 Main：async Main 在首个真正挂起的 await 后会把续体调度到线程池 MTA 线程，
+    // Application.Run/托盘就会离开 STA 主线程（[STAThread] 形同虚设，OLE 类功能会静默损坏）。
+    // 因此初始化阶段全部用阻塞等待（GetAwaiter().GetResult()/Thread.Sleep）完成，消息循环始终运行在 STA 主线程。
     [STAThread]
-    private static async Task<int> Main(string[] args)
+    private static int Main(string[] args)
     {
         // 1) 未捕获异常兜底：记录后尽量存活（spec 11.1）
         AppDomain.CurrentDomain.UnhandledException += (_, e) => { try { Log.Fatal(e.ExceptionObject as Exception, "未捕获异常"); } catch { } };
@@ -35,7 +38,7 @@ internal static class Program
             Directory.CreateDirectory(AppPaths.DataDir);
             Directory.CreateDirectory(AppPaths.LogsDir);
             using (var db = AppDbContext.Create(AppPaths.DbPath)) db.Database.EnsureCreated();
-            using (var db = AppDbContext.Create(AppPaths.DbPath)) port = await SettingsService.GetPortAsync(db) ?? SettingsService.DefaultPort;
+            using (var db = AppDbContext.Create(AppPaths.DbPath)) port = SettingsService.GetPortAsync(db).GetAwaiter().GetResult() ?? SettingsService.DefaultPort;
         }
         catch (Exception ex)
         {
@@ -47,8 +50,9 @@ internal static class Program
         }
 
         // 4) 单实例（spec 4.2）。--delayed-start 必须在抢 Mutex 之前等旧实例退出释放端口/Mutex，
-        //    否则重启时新实例会立刻抢锁失败而退化成"打开管理页后退出"
-        if (args.Contains("--delayed-start")) await Task.Delay(3000);
+        //    否则重启时新实例会立刻抢锁失败而退化成"打开管理页后退出"。
+        //    同步 Sleep 阻塞等待，主线程不挂起让渡，保持 STA
+        if (args.Contains("--delayed-start")) Thread.Sleep(3000);
         if (!SingleInstance.TryAcquire())
         {
             // 已在运行：直接打开管理页后退出（spec 4.2）
@@ -57,7 +61,7 @@ internal static class Program
             return 0;
         }
 
-        // 5) Web 宿主后台运行 + 托盘消息循环
+        // 5) Web 宿主后台运行 + 托盘消息循环（以下均在 STA 主线程）
         var app = BuildWebHost(port);
         var cts = new CancellationTokenSource();
         var hostTask = Task.Run(() => app.RunAsync(cts.Token));
@@ -71,9 +75,9 @@ internal static class Program
         Application.Run(ctx);
 
         // 消息循环结束（托盘"退出"或 AppRestarter 重启路径）后统一停 host：
-        // 重启路径只调 Application.Exit 不走托盘退出回调，若不在此 Cancel，await hostTask 永不返回、Mutex 不释放
+        // 重启路径只调 Application.Exit 不走托盘退出回调，若不在此 Cancel，hostTask 永不完成、Mutex 不释放
         cts.Cancel();
-        try { await hostTask; } catch (OperationCanceledException) { }
+        try { hostTask.GetAwaiter().GetResult(); } catch (OperationCanceledException) { }
         SingleInstance.Release();
         Log.CloseAndFlush();
         Environment.Exit(0);
