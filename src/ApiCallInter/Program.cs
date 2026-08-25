@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 
@@ -88,8 +89,10 @@ internal static class Program
     /// <summary>Task 7 宿主组装整体迁移至此，另增托盘/自启/更新占位注册。</summary>
     internal static WebApplication BuildWebHost(int port)
     {
-        // 内容根固定为 exe 目录：开机自启/AppRestarter 不带工作目录启动，CWD 任意时 UseStaticFiles 找不到 wwwroot 会整页 404
+        // 内容根固定为 exe 目录：开机自启/AppRestarter 不带工作目录启动，CWD 任意时 appsettings.json（默认配置链按内容根定位）会读不到
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
+        // wwwroot 已嵌入程序集（csproj EmbeddedResource + GenerateEmbeddedFilesManifest），静态页改从嵌入清单读取，不再依赖物理 wwwroot 目录
+        builder.Environment.WebRootFileProvider = new ManifestEmbeddedFileProvider(typeof(Program).Assembly, "wwwroot");
         // spec §10：host 由 appsettings Urls 模板控制（可改 0.0.0.0 远程管理），端口由设置页（DB）控制；
         // 代码 UseUrls 会覆盖配置 Urls 键，故从模板解析 host 后与 DB 端口重组，而不是直接忽略配置
         var urlTemplate = builder.Configuration["Urls"] ?? "http://127.0.0.1:61121";
