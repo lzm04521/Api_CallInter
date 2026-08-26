@@ -40,6 +40,7 @@ internal static class Program
             Directory.CreateDirectory(AppPaths.LogsDir);
             UpdateService.CleanupStaleUpdates();   // 启动清上次升级残留（spec 4.6），失败留待下次
             using (var db = AppDbContext.Create(AppPaths.DbPath)) db.Database.EnsureCreated();
+            AppDbContext.EnsureSortOrderColumn(AppPaths.DbPath);   // EnsureCreated 不迁移：老库补 SortOrder 列（新库已含，no-op）
             using (var db = AppDbContext.Create(AppPaths.DbPath)) port = SettingsService.GetPortAsync(db).GetAwaiter().GetResult() ?? SettingsService.DefaultPort;
         }
         catch (Exception ex)

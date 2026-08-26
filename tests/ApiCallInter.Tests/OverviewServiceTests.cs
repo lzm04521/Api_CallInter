@@ -34,4 +34,18 @@ public class OverviewServiceTests
     {
         public IReadOnlyDictionary<int, PlanSnapshot> GetSnapshot() => map;
     }
+
+    [Fact]
+    public async Task Overview_Projects_Follow_SortOrder_SameAsProjectList()
+    {
+        using var db = TestDb.Create();
+        db.Projects.Add(new Project { Name = "B", SortOrder = 2, IntervalSeconds = 60, Enabled = true });
+        db.Projects.Add(new Project { Name = "A", SortOrder = 3, IntervalSeconds = 60, Enabled = true });
+        db.Projects.Add(new Project { Name = "Z", SortOrder = 1, IntervalSeconds = 60, Enabled = true });
+        db.SaveChanges();
+
+        var o = await new OverviewService(db, new FixedState([])).GetAsync();
+
+        Assert.Equal(["Z", "B", "A"], o.Projects.Select(p => p.Name).ToList());
+    }
 }

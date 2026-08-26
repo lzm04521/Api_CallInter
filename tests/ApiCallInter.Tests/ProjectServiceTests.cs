@@ -70,4 +70,53 @@ public class ProjectServiceTests
         Assert.Equal("P2", updated!.Name);
         Assert.False(updated.Enabled);
     }
+
+    [Fact]
+    public async Task List_OrdersBy_SortOrder_ThenName()
+    {
+        var svc = NewSvc(out var db);
+        db.Projects.Add(new Project { Name = "B", SortOrder = 2, IntervalSeconds = 60 });
+        db.Projects.Add(new Project { Name = "A", SortOrder = 2, IntervalSeconds = 60 });   // 同序号退化按名称
+        db.Projects.Add(new Project { Name = "Z", SortOrder = 1, IntervalSeconds = 60 });
+        db.SaveChanges();
+
+        Assert.Equal(["Z", "A", "B"], (await svc.ListAsync()).Select(p => p.Name).ToList());
+    }
+
+    [Fact]
+    public async Task Create_AppendsSortOrder_IgnoringClientValue()
+    {
+        var svc = NewSvc(out var db);
+        db.Projects.Add(new Project { Name = "A", SortOrder = 3, IntervalSeconds = 60 });
+        db.SaveChanges();
+
+        var created = await svc.CreateAsync(new Project { Name = "B", IntervalSeconds = 60, SortOrder = 999 });
+        Assert.Equal(4, created.SortOrder);   // max+1，客户端传值被覆盖
+    }
+
+    [Fact]
+    public async Task Reorder_RewritesSortOrder_And_ListsFollow()
+    {
+        var svc = NewSvc(out _);
+        var a = await svc.CreateAsync(new Project { Name = "A", IntervalSeconds = 60 });
+        var b = await svc.CreateAsync(new Project { Name = "B", IntervalSeconds = 60 });
+        var c = await svc.CreateAsync(new Project { Name = "C", IntervalSeconds = 60 });
+
+        await svc.ReorderAsync([c.Id, a.Id, b.Id]);
+
+        Assert.Equal(["C", "A", "B"], (await svc.ListAsync()).Select(p => p.Name).ToList());
+    }
+
+    [Fact]
+    public async Task Reorder_Rejects_StaleIds()
+    {
+        var svc = NewSvc(out _);
+        var a = await svc.CreateAsync(new Project { Name = "A", IntervalSeconds = 60 });
+        var b = await svc.CreateAsync(new Project { Name = "B", IntervalSeconds = 60 });
+        var c = await svc.CreateAsync(new Project { Name = "C", IntervalSeconds = 60 });
+
+        await Assert.ThrowsAsync<ValidationException>(() => svc.ReorderAsync([a.Id, b.Id]));             // 缺项
+        await Assert.ThrowsAsync<ValidationException>(() => svc.ReorderAsync([a.Id, b.Id, c.Id, 999]));  // 多余/不存在
+        await Assert.ThrowsAsync<ValidationException>(() => svc.ReorderAsync([a.Id, a.Id, c.Id]));       // 重复
+    }
 }

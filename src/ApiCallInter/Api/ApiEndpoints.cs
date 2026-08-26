@@ -30,6 +30,8 @@ public static class ApiEndpoints
         g.MapPost("/projects", async (ProjectService s, Project p) => { var created = await s.CreateAsync(p); await reloader.ReloadAsync(); return Results.Ok(created); });
         g.MapPut("/projects/{id}", async (ProjectService s, int id, Project p) => { var u = await s.UpdateAsync(id, p); if (u is null) return Results.NotFound(); await reloader.ReloadAsync(); return Results.Ok(u); });
         g.MapDelete("/projects/{id}", async (ProjectService s, int id) => { var ok = await s.DeleteAsync(id); if (!ok) return Results.NotFound(); await reloader.ReloadAsync(); return Results.Ok(); });
+        // 手动排序：调度不依赖项目顺序，不触发 reload
+        g.MapPut("/projects/order", async (ProjectService s, ReorderRequest req) => { await s.ReorderAsync(req.Ids); return Results.Ok(); });
 
         g.MapPost("/projects/{id}/endpoints", async (ProjectService s, int id, ApiEndpoint e) => Results.Ok(await s.CreateEndpointAsync(id, e)));
         g.MapPut("/endpoints/{id}", async (ProjectService s, int id, ApiEndpoint e) => await s.UpdateEndpointAsync(id, e) is { } u ? Results.Ok(u) : Results.NotFound());
@@ -99,3 +101,4 @@ public static class ApiEndpoints
 // 请求体 DTO：minimal API 的简单类型参数只会从 query 绑定，按契约 {webPort}/{enabled} 的 JSON body 需用记录类型
 public record UpdatePortRequest(int WebPort);
 public record AutoStartRequest(bool Enabled);
+public record ReorderRequest(int[] Ids);

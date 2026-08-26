@@ -85,7 +85,9 @@ const ProjectsPage = {
     expanded: {},          // projectId -> 是否展开接口子表
     epLatest: {},          // endpointId -> 最新一条日志（展开时懒加载 /api/logs）
     editing: null,         // 项目表单（null=关闭弹层）
-    epEditing: null        // 接口表单
+    epEditing: null,       // 接口表单
+    dragId: null,          // 拖拽中的项目 id（null=未拖拽）
+    dragOverId: null       // 拖拽悬停目标行 id（高亮用）
   }),
   computed: {
     filteredProjects() {
@@ -110,6 +112,35 @@ const ProjectsPage = {
       if (!lr) return { cls: 'badge badge-gray', text: '暂无' };
       return lr.failed ? { cls: 'badge badge-red', text: lr.ok + '/' + lr.total + ' 成功' }
                        : { cls: 'badge badge-green', text: lr.ok + '/' + lr.total + ' 成功' };
+    },
+    // 拖拽排序：搜索过滤时子序列与全量序不对应，禁用（把手不渲染）
+    dragStart(p, ev) {
+      this.dragId = p.id;
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', String(p.id));   // Firefox 需 setData 才能启动拖拽
+    },
+    dragOver(p, ev) {
+      if (this.dragId === null || this.dragId === p.id) return;
+      ev.preventDefault();   // 允许放置，否则不触发 drop
+      ev.dataTransfer.dropEffect = 'move';
+      this.dragOverId = p.id;
+    },
+    dragEnd() { this.dragId = null; this.dragOverId = null; },
+    async drop(p, ev) {
+      ev.preventDefault();
+      const dragId = this.dragId;
+      this.dragId = null; this.dragOverId = null;
+      if (dragId === null || dragId === p.id) return;
+      const ids = this.projects.map(x => x.id);
+      ids.splice(ids.indexOf(dragId), 1);
+      // 鼠标在目标行上/下半决定前插/后插
+      const rect = ev.currentTarget.getBoundingClientRect();
+      const after = ev.clientY > rect.top + rect.height / 2;
+      ids.splice(ids.indexOf(p.id) + (after ? 1 : 0), 0, dragId);
+      try {
+        await api.put('/api/projects/order', { ids });
+        await this.load(); this.$emit('changed');   // changed → 根组件刷新概览与项目缓存
+      } catch (e) { alert('排序失败：' + e.message); await this.load(); }   // 失败重载回滚显示
     },
     async toggleExpand(p) {
       this.expanded[p.id] = !this.expanded[p.id];
@@ -213,9 +244,12 @@ const ProjectsPage = {
     </div>
     <div class="card" style="padding:0;overflow:hidden">
       <table>
-        <tr><th>项目</th><th>备注</th><th>间隔</th><th>抖动</th><th>接口</th><th>最近状态</th><th>启用</th><th style="width:200px">操作</th></tr>
+        <tr><th style="width:28px"></th><th>项目</th><th>备注</th><th>间隔</th><th>抖动</th><th>接口</th><th>最近状态</th><th>启用</th><th style="width:200px">操作</th></tr>
         <template v-for="p in filteredProjects" :key="p.id">
-          <tr>
+          <tr :class="{ dragging: dragId === p.id, 'drag-over': dragOverId === p.id }"
+              @dragover="dragOver(p, $event)" @drop="drop(p, $event)">
+            <td><span v-if="!search" class="drag-handle" draggable="true" title="拖动调整顺序"
+                  @dragstart="dragStart(p, $event)" @dragend="dragEnd">⠿</span></td>
             <td><b>{{ p.name }}</b></td>
             <td>{{ p.description }}</td>
             <td class="mono">{{ p.intervalSeconds }}s</td>
@@ -230,7 +264,7 @@ const ProjectsPage = {
             </td>
           </tr>
           <tr v-if="expanded[p.id]" class="expanded-row">
-            <td colspan="8" style="padding:14px 16px">
+            <td colspan="9" style="padding:14px 16px">
               <div style="display:flex;justify-content:space-between;margin-bottom:8px">
                 <b>{{ p.name }} · 接口列表</b>
                 <button class="btn" @click="openEpCreate(p)">＋ 新建接口</button>
@@ -255,7 +289,7 @@ const ProjectsPage = {
             </td>
           </tr>
         </template>
-        <tr v-if="!filteredProjects.length"><td colspan="8" style="color:#9ca3af">暂无项目，点"＋ 新建项目"创建</td></tr>
+        <tr v-if="!filteredProjects.length"><td colspan="9" style="color:#9ca3af">暂无项目，点"＋ 新建项目"创建</td></tr>
       </table>
     </div>
 

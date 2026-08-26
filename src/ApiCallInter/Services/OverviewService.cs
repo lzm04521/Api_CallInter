@@ -20,7 +20,8 @@ public class OverviewService(AppDbContext db, IScheduleState scheduleState)
         var total = await db.RequestLogs.LongCountAsync(l => l.RequestedAt >= since);
         var failed = await db.RequestLogs.LongCountAsync(l => l.RequestedAt >= since && !l.Success);
         var snapshot = scheduleState.GetSnapshot();
-        var projects = await db.Projects.Include(p => p.Endpoints).OrderBy(p => p.Name).ToListAsync();
+        var projects = await db.Projects.Include(p => p.Endpoints)
+            .OrderBy(p => p.SortOrder).ThenBy(p => p.Name).ToListAsync();   // 与项目管理页同序（老库 SortOrder 全 0 时退化按名称）
 
         var list = projects.Select(p =>
         {

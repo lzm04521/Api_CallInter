@@ -9,11 +9,13 @@ public class ValidationException(string message) : Exception(message);
 public class ProjectService(AppDbContext db)
 {
     public Task<List<Project>> ListAsync() =>
-        db.Projects.Include(p => p.Endpoints).OrderBy(p => p.Name).ToListAsync();
+        db.Projects.Include(p => p.Endpoints).OrderBy(p => p.SortOrder).ThenBy(p => p.Name).ToListAsync();
 
     public async Task<Project> CreateAsync(Project p)
     {
         ValidateProject(p);
+        p.SortOrder = await db.Projects.MaxAsync(x => (int?)x.SortOrder) ?? 0;
+        p.SortOrder++;   // 新建项目排最后；覆盖客户端传值，顺序只由 ReorderAsync 管理
         p.CreatedAt = p.UpdatedAt = DateTime.UtcNow;
         foreach (var e in p.Endpoints) { ValidateEndpoint(e); e.CreatedAt = e.UpdatedAt = DateTime.UtcNow; }
         db.Projects.Add(p);
@@ -42,6 +44,19 @@ public class ProjectService(AppDbContext db)
         db.Projects.Remove(p);
         await db.SaveChangesAsync();
         return true;
+    }
+
+    /// <summary>按传入的完整 id 顺序重编 SortOrder=1..n（项目量级 &lt;100，全量重编最简）；调度不依赖顺序，无需触发 reload。</summary>
+    public async Task ReorderAsync(int[] ids)
+    {
+        var projects = await db.Projects.ToListAsync();
+        // ids 必须与库中项目集合完全一致（成员+数量）：前端陈旧状态会静默错排，宁可 400 让其刷新
+        if (ids.Length != projects.Count || ids.Distinct().Count() != ids.Length ||
+            projects.Select(p => p.Id).Except(ids).Any())
+            throw new ValidationException("项目列表已变化，请刷新后重试");
+        var byId = projects.ToDictionary(p => p.Id);
+        for (var i = 0; i < ids.Length; i++) byId[ids[i]].SortOrder = i + 1;
+        await db.SaveChangesAsync();
     }
 
     public async Task<ApiEndpoint> CreateEndpointAsync(int projectId, ApiEndpoint e)
