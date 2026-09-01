@@ -29,6 +29,17 @@ const api = {
   del: (u) => api.request('DELETE', u),
 };
 
+/* 选项卡 hash 路由：#/overview 等；URL 是选项卡唯一状态源，刷新/直链恢复当前页，非法值回落概览 */
+const TABS = [
+  { id: 'overview', name: '概览' }, { id: 'projects', name: '项目管理' },
+  { id: 'logs', name: '请求日志' }, { id: 'settings', name: '系统设置' }, { id: 'about', name: '关于' }
+];
+const TAB_IDS = TABS.map(t => t.id);
+function tabFromHash() {
+  const h = (location.hash || '').replace(/^#\/?/, '');
+  return TAB_IDS.includes(h) ? h : 'overview';
+}
+
 /* ======================= 概览页 ======================= */
 
 const OverviewPage = {
@@ -557,11 +568,8 @@ const { createApp } = Vue;
 createApp({
   components: { OverviewPage, ProjectsPage, LogsPage, SettingsPage, AboutPage },
   data: () => ({
-    tab: 'overview',
-    tabs: [
-      { id: 'overview', name: '概览' }, { id: 'projects', name: '项目管理' },
-      { id: 'logs', name: '请求日志' }, { id: 'settings', name: '系统设置' }, { id: 'about', name: '关于' }
-    ],
+    tab: tabFromHash(),
+    tabs: TABS,
     overview: {},
     settings: {},
     projectsCache: [],   // 全量项目实体（含 endpoints），供项目级"立即请求"循环与启停切换取全字段
@@ -581,13 +589,19 @@ createApp({
     }
   },
   async mounted() {
+    window.addEventListener('hashchange', this.onHash);
     await this.loadOverview();
     await this.loadSettings();
     await this.loadProjectsCache();
     this.timer = setInterval(() => { if (this.tab === 'overview') this.loadOverview(); }, 5000);
   },
-  unmounted() { clearInterval(this.timer); },
+  unmounted() {
+    window.removeEventListener('hashchange', this.onHash);
+    clearInterval(this.timer);
+  },
   methods: {
+    // 侧栏 <a href="#/xxx"> 原生导航改 hash → 此处回写当前选项卡
+    onHash() { this.tab = tabFromHash(); },
     async loadOverview() {
       try { this.overview = await api.get('/api/overview'); }
       catch (e) { this.overview = { stats24h: {} }; }
@@ -639,7 +653,7 @@ createApp({
       const curPort = Number(location.port) || (location.protocol === 'https:' ? 443 : 80);
       if (newPort && newPort !== curPort) {
         alert('程序即将重启并切换到新端口 ' + newPort + '，页面将在数秒后自动跳转…');
-        setTimeout(() => { location.href = location.protocol + '//' + location.hostname + ':' + newPort + '/'; }, 5000);
+        setTimeout(() => { location.href = location.protocol + '//' + location.hostname + ':' + newPort + '/' + location.hash; }, 5000);
       } else {
         alert('程序即将重启，页面稍后自动恢复');
         setTimeout(() => location.reload(), 5000);
